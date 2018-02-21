@@ -1,0 +1,132 @@
+---
+title: "Machine"
+author: "Donna"
+date: "February 17, 2018"
+output: html_document
+      
+---
+Practical Machine Langauage Project
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load Libraries Needed for Project
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+library(caret)
+```
+Download the files
+--Once loaded all files will run from Data Directory
+
+```{r}
+trainUrl <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+trainFile <- "./data/pml-training.csv"
+testFile  <- "./data/pml-testing.csv"
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+if (!file.exists(trainFile)) {
+  download.file(trainUrl, destfile=trainFile)
+}
+if (!file.exists(testFile)) {
+  download.file(testUrl, destfile=testFile)
+}
+
+```
+See the files and  and make sure that the Train and Test Data Sets are running
+```{r}
+trainRaw <- read.csv("./data/pml-training.csv")
+testRaw <- read.csv("./data/pml-testing.csv")
+dim(trainRaw)
+dim(testRaw)
+```
+
+
+Clean the Data
+`Once we see the data we need to clean the data using the sum function
+```{r}
+sum(complete.cases(trainRaw))
+```
+Cleaning the set leaves us 406
+
+The missing values need to be removed using the is.na function
+
+```{r}
+trainRaw <- trainRaw[, colSums(is.na(trainRaw)) == 0] 
+testRaw <- testRaw[, colSums(is.na(testRaw)) == 0] 
+```
+
+Once the Data has been clean up using the raw data  then complete the cleanup and introduce the classe variable
+
+```{r}
+
+classe <- trainRaw$classe
+trainRemove <- grepl("^X|timestamp|window", names(trainRaw))
+trainRaw <- trainRaw[, !trainRemove]
+trainClean <- trainRaw[, sapply(trainRaw, is.numeric)]
+trainClean$classe <- classe
+testRemove <- grepl("^X|timestamp|window", names(testRaw))
+testRaw <- testRaw[, !testRemove]
+testClean <- testRaw[, sapply(testRaw, is.numeric)]
+```
+
+Use the Train Function for a 75% traning set and a 25 % validation set
+```{r}
+set.seed(22520) # For reproducibile purpose
+inTrain <- createDataPartition(trainClean$classe, p=0.75, list=F)
+trainData <- trainClean[inTrain, ]
+testData <- trainClean[-inTrain, ]
+```
+
+
+Using Random Forest we will use the 5 fold cross validation
+```{r}
+model1Rf <- trainControl(method="cv", 5) #Control
+model2Rf <- train(classe ~ ., data=trainData, method="rf", trControl=model1Rf, ntree=250)
+model2Rf
+```
+The accuracy is 99% while Kappa is 98% and the final mytry bvalue is 2
+
+```{r}
+performanceRf <- predict(model2Rf, testData)
+confusionMatrix(testData$classe, performanceRf)
+```
+
+After Prediction
+
+
+```{r}
+accurate <- postResample(performanceRf, testData$classe)
+accurate
+sampleError <- 1 - as.numeric(confusionMatrix(testData$classe, performanceRf)$overall[1])
+sampleError
+```
+
+The estimated accuracy is 99 % while the sample error is .7%
+
+
+```{r}
+result <- predict(model2Rf, testClean[, -length(names(testClean))])
+result
+```
+```{r}
+corrPlot <- cor(trainData[, -length(names(trainData))])
+corrplot(corrPlot, method="color")
+```
+```{r}
+treeModel <- rpart(classe ~ ., data=trainData, method="class")
+prp(treeModel) #plotted 
+```
+
+
+Reference:
+
+https://github.com/flyingdisc/practical-machine-learning/blob/master/project-report.Rmd
+
+
+
